@@ -6,7 +6,6 @@ import {
   PlasmicRootProvider,
 } from "@plasmicapp/loader-nextjs";
 import type { GetStaticPaths, GetStaticProps } from "next";
-
 import Error from "next/error";
 import { useRouter } from "next/router";
 import { PLASMIC } from "@/plasmic-init";
@@ -18,37 +17,35 @@ export default function PlasmicLoaderPage(props: {
   const { plasmicData, queryCache } = props;
   const router = useRouter();
 
-  const [sliderValue, setSliderValue] = React.useState(0);
-  //const [apiResult, setApiResult] = React.useState<string | number>("");
-  //const [testStateTextVariable, setTestStateTextVariable] = React.useState<string>("");
+  // === State variables ===
+  const [sliderValueTs, setSliderValueTs] = React.useState(0);
+
+  // For apiTestTextBox
   const [testStateTextVariable, setTestStateTextVariable] = React.useState<string>("loading...");
-/*   const debugMapping = {
-    //["apiTestTextBox"]: {
-      ["TestStateTextVariable"]: testStateTextVariable,
-    //}
-  };
-  console.log("componentProps about to send:", debugMapping); */
 
-  const componentProps = {
-  // keep the slider mapping (if you want the slider still connected)
-  testSlider1: {
-    Value: sliderValue,
-    onValueChange: onValueChange,
-  },
+  // For multiplyBox
+  //const [multiplyBoxValue, setMultiplyBoxValue] = React.useState<number>(0);
 
-  // IMPORTANT: replace 'apiElementName' and 'propNameHere' with the exact strings FROM PLASMIC
-  apiTestTextBox: {            // <-- e.g. apiTestTextBox  (element name from Plasmic)
-    text: testStateTextVariable, // <-- e.g. testStateTextVariable (prop name exactly)
-  },
-};
+  // For the slider value returned from PA
+  const [returnedMultiplePa, setReturnedMultiplePa] = React.useState<number | null>(null);
 
-console.log("componentProps about to send TO PLASMIC:", componentProps);
-console.log("componentProps about to send TO PLASMIC:", JSON.stringify(componentProps));
+  // === Component props mapping ===
+  /* const componentProps = {
+    testSlider1: {
+      Value: sliderValueTs,
+      onValueChange: onValueChange,
+    },
+    apiTestTextBox: {            
+      text: testStateTextVariable, 
+    },
+    multiplyBox: {            
+      valueMb: multiplyBoxValue, // match your $props.valueMb in Plasmic
+    },
+  }; */
 
+//console.log("componentProps about to send TO PLASMIC:", componentProps);
+//console.log("componentProps about to send TO PLASMIC:", JSON.stringify(componentProps));
 
-
-
-  // <-- Add this useEffect to fetch the initial number once on mount
   React.useEffect(() => {
     fetch("https://elliotcookie.pythonanywhere.com/number")
       .then((res) => res.json())
@@ -61,39 +58,34 @@ console.log("componentProps about to send TO PLASMIC:", JSON.stringify(component
       .catch(console.error);
   }, []);
 
-  async function onValueChange(value: number) {
-    console.log("About to POST to /multiply:", { value: sliderValue });
+  async function onValueChange(newSliderValue: number) {
+  console.log("🔄 Slider changed to:", newSliderValue);
+  setSliderValueTs(newSliderValue);
+
+  try {
+    console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
+    
     const res = await fetch("https://elliotcookie.pythonanywhere.com/multiply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ value: sliderValue })
+      body: JSON.stringify({ value: newSliderValue }), // send slider value to PA
     });
-    console.log("Response status:", res.status);
+
+    console.log("📥 Response status:", res.status);
     const json = await res.json();
-    console.log("Response JSON:", json);
+    console.log("✅ Response JSON from PA:", json);
 
-    console.log("Slider changed to:", value);
-    setSliderValue(value);
+    // Store returned multiplied value from PA
+    if (typeof json.result === "number") {
+      setReturnedMultiplePa(json.result);
+    } else {
+      console.warn("⚠️ API returned unexpected format:", json);
+    }
 
-    // Send value to Flask backend
-    fetch("https://elliotcookie.pythonanywhere.com/multiply", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ value }), // send the slider number
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("API response:", data);
-        //if (data.result !== undefined) {
-        // setApiResult(String(data.result)); // update the text box with backend result
-        //}
-      })
-      .catch((err) => {
-        console.error("Error calling API:", err);
-      });
+  } catch (err) {
+    console.error("❌ Error calling API:", err);
   }
+}
 
   if (!plasmicData || plasmicData.entryCompMetas.length === 0) {
     return <Error statusCode={404} />;
@@ -110,35 +102,25 @@ console.log("componentProps about to send TO PLASMIC:", JSON.stringify(component
       pageQuery={router.query}
     >
       <PlasmicComponent
-        component={pageMeta.displayName}
-        componentProps={componentProps}
-        //componentProps={debugMapping}
-        //componentProps={{
-
-
-          //testSlider1: {
-           // Value: sliderValue,
-           // onValueChange: onValueChange,
-          //},
-
-
-
-          // Update the text box component. Use the exact Plasmic displayName for that
-          // child component (replace `textBox1` below if your component has a different name).
-          
-            //TestStateTextVariable: testStateTextVariable,
-           
-
-
-
-        //}}
+      component={pageMeta.displayName}
+      componentProps={{
+        testSlider1: {
+          Value: sliderValueTs, // TS slider value → slider component
+          onValueChange: onValueChange,
+        },
+        apiTestTextBox: {
+          testStateTextVariable: sliderValueTs, // If you still want slider value here
+        },
+        multiplyBox: {
+          valueMb: returnedMultiplePa ?? "Waiting...", 
+          // The multiplied value from PA → multiplyBox
+        },
+      }}
       />
     </PlasmicRootProvider>
   );
 }
 
-
-// Add these getStaticPaths and getStaticProps:
 
 export const getStaticPaths: GetStaticPaths = async () => {
   // You can preload the paths you want to support here or fallback to blocking
