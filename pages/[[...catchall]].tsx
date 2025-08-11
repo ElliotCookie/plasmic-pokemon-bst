@@ -62,7 +62,7 @@ export default function PlasmicLoaderPage(props: {
 
       // POST to backend once
       console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
-      const res = await fetch(`${BACKEND}/multiply`, {
+      const res = await fetch("/api/proxyMultiply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: newSliderValue }),
