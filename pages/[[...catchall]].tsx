@@ -38,9 +38,18 @@ export default function PlasmicLoaderPage(props: {
   
   // type guard: returns true if obj looks like { result: number | string }
   function isResultObject(obj: unknown): obj is { result: number | string } {
-    if (!obj || typeof obj !== "object") return false;
-    return "result" in (obj as Record<string, unknown>) &&
-      (typeof (obj as any).result === "number" || typeof (obj as any).result === "string");
+    if (obj === null || obj === undefined) return false;
+    if (typeof obj !== "object") return false;
+
+    const o = obj as Record<string, unknown>;
+
+    // Use hasOwnProperty to avoid inherited properties
+    if (!Object.prototype.hasOwnProperty.call(o, "result")) {
+      return false;
+    }
+
+    const val = o["result"];
+    return typeof val === "number" || typeof val === "string";
   }
 
 
@@ -85,9 +94,10 @@ export default function PlasmicLoaderPage(props: {
     let parsed: unknown = null;
     try {
       parsed = txt ? JSON.parse(txt) : null;
-    } catch (parseErr) {
-      console.warn("Response from backend was not valid JSON. Raw text:", txt);
-      parsed = null;
+    } catch (err) {
+    // make sure the caught error is logged and used so it's not flagged
+    console.error("Error calling API:", err);
+    setMultiplyResultPa(null);
     }
 
     // Validate parsed shape with type guard
@@ -139,7 +149,7 @@ export default function PlasmicLoaderPage(props: {
     <PlasmicRootProvider
       loader={PLASMIC}
       prefetchedData={plasmicData}
-      prefetchedQueryData={queryCache as any}
+      prefetchedQueryData={queryCache as Record<string, unknown> | undefined}
       pageRoute={pageMeta.path}
       pageParams={pageMeta.params}
       pageQuery={router.query}
