@@ -1,3 +1,4 @@
+// pages/[[...catchall]].tsx
 import * as React from "react";
 import {
   PlasmicComponent,
@@ -6,124 +7,117 @@ import {
   PlasmicRootProvider,
 } from "@plasmicapp/loader-nextjs";
 import type { GetStaticPaths, GetStaticProps } from "next";
-
 import Error from "next/error";
 import { useRouter } from "next/router";
 import { PLASMIC } from "@/plasmic-init";
 
-type Props = {
+/**
+ * Plasmic loader page that:
+ * - fetches Plasmic page data at build time (getStaticProps/getStaticPaths)
+ * - mounts a client-side slider that POSTs to your PythonAnywhere backend
+ * - shows an initial number fetched from /number on load
+ * - displays multiply result in the multiplyBox child component
+ */
+
+export default function PlasmicLoaderPage(props: {
   plasmicData?: ComponentRenderData;
   queryCache?: Record<string, unknown>;
-};
-
-export default function PlasmicLoaderPage(props: Props) {
+}) {
   const { plasmicData, queryCache } = props;
   const router = useRouter();
 
-  // Slider value (TypeScript variable name makes it obvious it's our local state)
-  const [sliderValueTs, setSliderValueTs] = React.useState<number>(0);
+  // -----------------------
+  // Top-level Hooks (must be here)
+  // -----------------------
+  const [sliderValue, setSliderValue] = React.useState<number>(0);
+  const [initialNumber, setInitialNumber] = React.useState<string>("loading...");
+  const [multiplyResultPa, setMultiplyResultPa] = React.useState<number | null>(null);
 
-  // Text shown in apiTestTextBox (string)
-  const [apiTextBoxValue, setApiTextBoxValue] = React.useState<string>("loading...");
+  // Backend base URL: use env in production, fallback to your PA domain for local dev
+  const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
 
-  // Value to show in multiplyBox (result from PythonAnywhere)
-  const [multiplyBoxValue, setMultiplyBoxValue] = React.useState<number | null>(null);
+  // Fetch initial number once on client-side mount
+  React.useEffect(() => {
+    console.log("📥 Fetching initial /number from PythonAnywhere...");
+    fetch(`${BACKEND}/number`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("API fetch /number result:", data);
+        if (data && data.result !== undefined) {
+          setInitialNumber(String(data.result));
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching initial number:", err);
+        setInitialNumber("error");
+      });
+  }, [BACKEND]);
 
+  // Handler called when slider changes in Plasmic
+  async function onValueChange(newSliderValue: number) {
+    try {
+      // immediate UI update
+      setSliderValue(newSliderValue);
+      console.log("Slider event - newSliderValue:", newSliderValue);
+
+      // POST to backend once
+      console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
+      const res = await fetch(`${BACKEND}/multiply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: newSliderValue }),
+      });
+      console.log("Response status:", res.status);
+
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch (parseErr) {
+        console.warn("Response not JSON or parse failed", parseErr);
+      }
+
+      if (res.ok && json && json.result !== undefined) {
+        const numericResult = Number(json.result);
+        setMultiplyResultPa(numericResult);
+        console.log("API response data:", json);
+      } else {
+        console.warn("API error or no result:", res.status, json);
+        setMultiplyResultPa(null);
+      }
+    } catch (err) {
+      console.error("Error calling API:", err);
+      setMultiplyResultPa(null);
+    }
+  }
+
+  // Keep the Plasmic required early-return after hooks.
   if (!plasmicData || plasmicData.entryCompMetas.length === 0) {
     return <Error statusCode={404} />;
   }
   const pageMeta = plasmicData.entryCompMetas[0];
 
-  // Fetch a simple number on mount (example: /number endpoint that returns {result: 43})
-  React.useEffect(() => {
-    (async () => {
-      try {
-        console.log("📥 Fetching initial /number from PythonAnywhere...");
-        const res = await fetch("https://elliotcookie.pythonanywhere.com/number");
-        const json = await res.json();
-        console.log("API fetch /number result:", json);
-        if (json && json.result !== undefined) {
-          setApiTextBoxValue(String(json.result));
-        }
-      } catch (err) {
-        console.error("Error fetching /number:", err);
-        setApiTextBoxValue("error");
-      }
-    })();
-  }, []);
-
-  // Called when slider finishes changing (Plasmic will call this via the interaction prop)
-  async function onValueChange(newSliderValue: number) {
-    try {
-      console.log("Slider event - newSliderValue:", newSliderValue);
-
-      // Update local slider UI state immediately
-      setSliderValueTs(newSliderValue);
-
-      // Send to backend to multiply (PythonAnywhere)
-      console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
-      const res = await fetch("https://elliotcookie.pythonanywhere.com/multiply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: newSliderValue }),
-      });
-
-      console.log("Response status:", res.status);
-
-      // Try parse json (catch if server returned HTML error etc)
-      let data: unknown;
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        console.error("Failed to parse response as JSON", parseErr);
-        setMultiplyBoxValue(null);
-        return;
-      }
-
-      console.log("API response data:", data);
-
-      // If backend returns { result: <number> }, use that
-      const asAny = data as { result?: number; error?: string };
-      if (asAny && typeof asAny.result === "number") {
-        setMultiplyBoxValue(asAny.result);
-      } else if (asAny && asAny.error) {
-        console.warn("Backend error:", asAny.error);
-        setMultiplyBoxValue(null);
-      } else {
-        setMultiplyBoxValue(null);
-      }
-    } catch (err) {
-      console.error("Error calling API:", err);
-      setMultiplyBoxValue(null);
-    }
-  }
-
-  // Map our local state into the prop mapping Plasmic expects.
-  // Make sure the object keys exactly match the element display names and prop names in Plasmic.
+  // Map component props to Plasmic children (names must match your Plasmic component display names / props)
   const componentProps = {
     testSlider1: {
-      // Plasmic prop name is `Value` (capital V) — preserve exact spelling
-      Value: sliderValueTs,
+      // NOTE: make sure the prop name here (value) matches the prop name in Plasmic for the slider
+      Value: sliderValue, // if Plasmic expects `Value` (capital V) — use that. Match what you configured.
       onValueChange: onValueChange,
     },
-    // If your top-level text component expects a `text` prop:
     apiTestTextBox: {
-      text: apiTextBoxValue,
+      // the text prop in your Plasmic text box (match exactly)
+      text: initialNumber,
     },
-    // multiplyBox -> prop name in Plasmic is valueMb (or what you set); make exact match:
     multiplyBox: {
-      valueMb: multiplyBoxValue ?? 0,
+      // the prop name you set in Plasmic for the multiply box (valueMb or similar). Adjust if different.
+      valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
   };
-
-  // Optional debug log that will appear in the browser console (production will also show console logs).
-  console.debug("componentProps about to send TO PLASMIC:", componentProps);
 
   return (
     <PlasmicRootProvider
       loader={PLASMIC}
       prefetchedData={plasmicData}
-      prefetchedQueryData={queryCache}
+      prefetchedQueryData={queryCache as any}
       pageRoute={pageMeta.path}
       pageParams={pageMeta.params}
       pageQuery={router.query}
@@ -134,25 +128,32 @@ export default function PlasmicLoaderPage(props: Props) {
 }
 
 /**
- * Leave getStaticProps/getStaticPaths as provided by Plasmic. If you have local copies/migrations,
- * ensure they still exist in this file (we did not modify those here).
- *
- * If you removed the generated getStaticProps/getStaticPaths earlier, restore them from your repo.
+ * keep getStaticProps/getStaticPaths generated by Plasmic so pages are discovered and pre-rendered.
+ * These were the typical Plasmic-generated implementations — they must exist for the catchall route.
  */
+
 export const getStaticProps: GetStaticProps = async (context) => {
   const { catchall } = context.params ?? {};
   const plasmicPath =
-    typeof catchall === "string" ? catchall : Array.isArray(catchall) ? `/${catchall.join("/")}` : "/";
+    typeof catchall === "string"
+      ? catchall
+      : Array.isArray(catchall)
+      ? `/${catchall.join("/")}`
+      : "/";
   const plasmicData = await PLASMIC.maybeFetchComponentData(plasmicPath);
   if (!plasmicData) {
+    // non-Plasmic catch-all
     return { props: {} };
   }
   const pageMeta = plasmicData.entryCompMetas[0];
+
+  // extractPlasmicQueryData runs a prepass to gather data used by components (keep as-is)
   const queryCache = await extractPlasmicQueryData(
     <PlasmicRootProvider loader={PLASMIC} prefetchedData={plasmicData} pageRoute={pageMeta.path} pageParams={pageMeta.params}>
       <PlasmicComponent component={pageMeta.displayName} />
     </PlasmicRootProvider>
   );
+
   return { props: { plasmicData, queryCache }, revalidate: 60 };
 };
 
