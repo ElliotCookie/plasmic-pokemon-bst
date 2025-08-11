@@ -35,6 +35,14 @@ export default function PlasmicLoaderPage(props: {
 
   // Backend base URL: use env in production, fallback to your PA domain for local dev
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
+  
+  // type guard: returns true if obj looks like { result: number | string }
+  function isResultObject(obj: unknown): obj is { result: number | string } {
+    if (!obj || typeof obj !== "object") return false;
+    return "result" in (obj as Record<string, unknown>) &&
+      (typeof (obj as any).result === "number" || typeof (obj as any).result === "string");
+  }
+
 
   // Fetch initial number once on client-side mount
   React.useEffect(() => {
@@ -55,40 +63,54 @@ export default function PlasmicLoaderPage(props: {
 
   // Handler called when slider changes in Plasmic
   async function onValueChange(newSliderValue: number) {
+  try {
+    // immediate UI update
+    setSliderValue(newSliderValue);
+    console.log("Slider event - newSliderValue:", newSliderValue);
+
+    // POST to backend
+    console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
+    const res = await fetch(`${BACKEND}/multiply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value: newSliderValue }),
+    });
+
+    console.log("Response status:", res.status);
+
+    // Read as text first (robust if backend returns HTML/text)
+    const txt = await res.text();
+
+    // Try to parse JSON (safe: won't throw because we control try/catch)
+    let parsed: unknown = null;
     try {
-      // immediate UI update
-      setSliderValue(newSliderValue);
-      console.log("Slider event - newSliderValue:", newSliderValue);
+      parsed = txt ? JSON.parse(txt) : null;
+    } catch (parseErr) {
+      console.warn("Response from backend was not valid JSON. Raw text:", txt);
+      parsed = null;
+    }
 
-      // POST to backend once
-      console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
-      const res = await fetch("/api/proxyMultiply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: newSliderValue }),
-      });
-      console.log("Response status:", res.status);
-
-      let json: any = null;
-      try {
-        json = await res.json();
-      } catch (parseErr) {
-        console.warn("Response not JSON or parse failed", parseErr);
-      }
-
-      if (res.ok && json && json.result !== undefined) {
-        const numericResult = Number(json.result);
+    // Validate parsed shape with type guard
+    if (res.ok && isResultObject(parsed)) {
+      // result might be string or number — normalise to number
+      const numericResult = Number(parsed.result);
+      if (!Number.isNaN(numericResult)) {
         setMultiplyResultPa(numericResult);
-        console.log("API response data:", json);
+        console.log("API returned numeric result:", numericResult);
       } else {
-        console.warn("API error or no result:", res.status, json);
+        console.warn("API returned result that is not numeric:", parsed.result);
         setMultiplyResultPa(null);
       }
-    } catch (err) {
-      console.error("Error calling API:", err);
+    } else {
+      console.warn("API error or unexpected response shape:", res.status, parsed);
       setMultiplyResultPa(null);
     }
+  } catch (err) {
+    console.error("Error calling API:", err);
+    setMultiplyResultPa(null);
   }
+}
+
 
   // Keep the Plasmic required early-return after hooks.
   if (!plasmicData || plasmicData.entryCompMetas.length === 0) {
