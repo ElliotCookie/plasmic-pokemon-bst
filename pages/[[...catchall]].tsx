@@ -47,7 +47,7 @@ export default function PlasmicLoaderPage(props: {
     type1?: string | null;
     type2?: string | null;
     bst?: number | null;
-    stats?: Record<string, any> | null;
+    stats?: Record<string, unknown> | null;
   }
 
   interface OptimiserResponse {
@@ -75,7 +75,7 @@ export default function PlasmicLoaderPage(props: {
     return typeof val === "number" || typeof val === "string";
   }
 
-  // --- Type guard to validate backend response shape ---
+/*   // --- Type guard to validate backend response shape ---
   function isOptimiserResponse(obj: unknown): obj is OptimiserResponse {
     if (!obj || typeof obj !== "object") return false;
     const o = obj as Record<string, unknown>;
@@ -93,7 +93,7 @@ export default function PlasmicLoaderPage(props: {
     if (i < pkmnTeamNames.length) return pkmnTeamNames[i] ?? "";
     return "";
   }
-
+ */
 
 
 
