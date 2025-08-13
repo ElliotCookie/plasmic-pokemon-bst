@@ -33,9 +33,32 @@ export default function PlasmicLoaderPage(props: {
   const [initialNumber, setInitialNumber] = React.useState<string>("loading...");
   const [multiplyResultPa, setMultiplyResultPa] = React.useState<number | null>(null);
 
+  // --- Pokémon team names state (placeholders 1..6) ---
+  const [pkmnTeamNames, setPkmnTeamNames] = React.useState<string[]>(
+  Array.from({ length: 6 }, (_, i) => String(i + 1)));
+
   // Backend base URL: use env in production, fallback to your PA domain for local dev
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
-  
+  const OPTIMISE_ENDPOINT = `${BACKEND}/api/optimise`;
+
+  // --- TypeScript interfaces for defensive typing ---
+  interface TeamMember {
+    name?: string | null;
+    type1?: string | null;
+    type2?: string | null;
+    bst?: number | null;
+    stats?: Record<string, any> | null;
+  }
+
+  interface OptimiserResponse {
+  error: boolean;
+  status?: string;
+  objective_value?: number;
+  team?: TeamMember[];
+  type_weakness_totals?: Record<string, number>;
+}
+
+
   // type guard: returns true if obj looks like { result: number | string }
   function isResultObject(obj: unknown): obj is { result: number | string } {
     if (obj === null || obj === undefined) return false;
@@ -51,6 +74,28 @@ export default function PlasmicLoaderPage(props: {
     const val = o["result"];
     return typeof val === "number" || typeof val === "string";
   }
+
+  // --- Type guard to validate backend response shape ---
+  function isOptimiserResponse(obj: unknown): obj is OptimiserResponse {
+    if (!obj || typeof obj !== "object") return false;
+    const o = obj as Record<string, unknown>;
+    if (!Object.prototype.hasOwnProperty.call(o, "team")) return false;
+    const team = o.team;
+    if (!Array.isArray(team)) return false;
+    // ensure each team entry is either an object or undefined/null
+    return team.every((t) => t === null || typeof t === "object" || typeof t === "string");
+  }
+
+
+  // Helper to safely get the name for a given index
+  function getNameForIndex(i: number): string {
+    if (i < 0) return "";
+    if (i < pkmnTeamNames.length) return pkmnTeamNames[i] ?? "";
+    return "";
+  }
+
+
+
 
 
   // Fetch initial number once on client-side mount
@@ -69,6 +114,38 @@ export default function PlasmicLoaderPage(props: {
         setInitialNumber("error");
       });
   }, [BACKEND]);
+
+
+// place OPTIMISE_ENDPOINT near BACKEND, then add this useEffect:
+
+  React.useEffect(() => {
+    console.log("📥 Fetching optimiser /api/optimise from PythonAnywhere...");
+    fetch(`${OPTIMISE_ENDPOINT}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("API fetch /api/optimise result:", data);
+        // Defensive: ensure data.team exists and is an array
+        if (data && Array.isArray(data.team)) {
+          const names = Array.from({ length: 6 }, (_, i) => {
+            const entry = data.team[i];
+            if (!entry) return String(i + 1);
+            if (typeof entry === "string") return entry;
+            return entry.name ?? String(i + 1);
+          });
+          setPkmnTeamNames(names);
+        } else {
+          console.warn("Unexpected /api/optimise response shape, keeping placeholders:", data);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching /api/optimise:", err);
+        // keep placeholders on error (no set)
+      });
+  }, [OPTIMISE_ENDPOINT]); // keeps same pattern as your /number effect
+
+
+
+
 
   // Handler called when slider changes in Plasmic
   async function onValueChange(newSliderValue: number) {
@@ -143,6 +220,7 @@ export default function PlasmicLoaderPage(props: {
       // the prop name you set in Plasmic for the multiply box (valueMb or similar). Adjust if different.
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
+    teamNames: pkmnTeamNames,
   };
 
   return (
