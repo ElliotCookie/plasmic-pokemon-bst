@@ -118,30 +118,34 @@ export default function PlasmicLoaderPage(props: {
 
 // place OPTIMISE_ENDPOINT near BACKEND, then add this useEffect:
 
-  React.useEffect(() => {
-    console.log("📥 Fetching optimiser /api/optimise from PythonAnywhere...");
-    fetch(`${OPTIMISE_ENDPOINT}`)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("API fetch /api/optimise result:", data);
-        // Defensive: ensure data.team exists and is an array
-        if (data && Array.isArray(data.team)) {
-          const names = Array.from({ length: 6 }, (_, i) => {
-            const entry = data.team[i];
-            if (!entry) return String(i + 1);
-            if (typeof entry === "string") return entry;
-            return entry.name ?? String(i + 1);
-          });
-          setPkmnTeamNames(names);
-        } else {
-          console.warn("Unexpected /api/optimise response shape, keeping placeholders:", data);
-        }
-      })
-      .catch((err) => {
-        console.error("Error fetching /api/optimise:", err);
-        // keep placeholders on error (no set)
-      });
-  }, [OPTIMISE_ENDPOINT]); // keeps same pattern as your /number effect
+React.useEffect(() => {
+  console.log("📥 Fetching optimiser /api/optimise from PythonAnywhere...");
+
+  // Avoid re-fetching if we've already populated real names
+  const isPlaceholder = pkmnTeamNames.every((v, idx) => v === String(idx + 1));
+  if (!isPlaceholder) return;
+
+  fetch(`${OPTIMISE_ENDPOINT}`)
+    .then((res) => res.json() as Promise<OptimiserResponse>) // <- use the interface here
+    .then((data) => {
+      console.log("API fetch /api/optimise result:", data);
+      if (data && Array.isArray(data.team)) {
+        const names = Array.from({ length: 6 }, (_, i) => {
+          const entry = data.team![i];
+          if (!entry) return String(i + 1);
+          if (typeof entry === "string") return entry;
+          return entry.name ?? String(i + 1);
+        });
+        setPkmnTeamNames(names);
+      } else {
+        console.warn("Unexpected /api/optimise response shape, keeping placeholders:", data);
+      }
+    })
+    .catch((err) => {
+      console.error("Error fetching /api/optimise:", err);
+      // keep placeholders on error (no set)
+    });
+}, [OPTIMISE_ENDPOINT, pkmnTeamNames]);
 
 
 
