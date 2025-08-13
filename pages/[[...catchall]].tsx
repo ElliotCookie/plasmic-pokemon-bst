@@ -135,6 +135,9 @@ React.useEffect(() => {
           return entry.name ?? String(i + 1);
         });
         setPkmnTeamNames(names);
+        // debug helpers — remove later
+        console.log("DEBUG: pkmnTeamNames set =>", names);
+        (window as any).debugPkmnTeamNames = names;
       } else {
         console.warn("Unexpected /api/optimise response shape, keeping placeholders:", data);
       }
@@ -223,8 +226,11 @@ React.useEffect(() => {
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
     teamNames: pkmnTeamNames,
+    
   };
 
+
+  
   return (
     <PlasmicRootProvider
       loader={PLASMIC}
