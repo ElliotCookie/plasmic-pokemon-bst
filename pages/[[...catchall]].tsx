@@ -222,7 +222,7 @@ React.useEffect(() => {
       // the prop name you set in Plasmic for the multiply box (valueMb or similar). Adjust if different.
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
-    items:pkmnTeamNames
+    items:pkmnTeamNames,
     teamNames: pkmnTeamNames,
     
   };
