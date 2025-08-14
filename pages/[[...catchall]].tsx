@@ -116,34 +116,51 @@ export default function PlasmicLoaderPage(props: {
   }, [BACKEND]);
 
 
+// at top of the component
+const didFetchOptimiser = React.useRef(false);
+
+// Optimiser fetch — runs once on mount (or until you reset didFetchOptimiser.current)
 React.useEffect(() => {
+  if (didFetchOptimiser.current) return; // already fetched once
+  didFetchOptimiser.current = true;
+
   console.log("📥 Fetching optimiser /api/optimise from PythonAnywhere...");
 
-  // Avoid re-fetching if we've already populated real names
-  const isPlaceholder = pkmnTeamNames.every((v, idx) => v === String(idx + 1));
-  if (!isPlaceholder) return;
-
   fetch(`${OPTIMISE_ENDPOINT}`)
-    .then((res) => res.json() as Promise<OptimiserResponse>) // <- use the interface here
+    .then((res) => res.json() as Promise<OptimiserResponse>)
     .then((data) => {
       console.log("API fetch /api/optimise result:", data);
-      if (data && Array.isArray(data.team)) {
-        const names = Array.from({ length: 6 }, (_, i) => {
-          const entry = data.team![i];
-          if (!entry) return String(i + 1);
-          if (typeof entry === "string") return entry;
-          return entry.name ?? String(i + 1);
-        });
-        setPkmnTeamNames(names);
-      } else {
+
+      // defensive: if data.team is not an array, keep placeholders
+      if (!data || !Array.isArray(data.team)) {
         console.warn("Unexpected /api/optimise response shape, keeping placeholders:", data);
+        return;
       }
+
+      // Build names array from returned team entries
+      const returnedTeam = data.team as (TeamMember | null | string)[];
+      const extractedNames: string[] = returnedTeam.map((entry, idx) => {
+        if (!entry) return ""; // empty if missing
+        if (typeof entry === "string") return entry;
+        return entry.name ?? "";
+      });
+
+      // We have 6 UI slots. Trim or pad to 6.
+      const MAX_SLOTS = 6;
+      const paddedNames = extractedNames.slice(0, MAX_SLOTS);
+      while (paddedNames.length < MAX_SLOTS) {
+        // fill empty slots with empty string or placeholder like "—"
+        paddedNames.push("");
+      }
+
+      console.log("DEBUG: setting pkmnTeamNames ->", paddedNames);
+      setPkmnTeamNames(paddedNames);
     })
     .catch((err) => {
       console.error("Error fetching /api/optimise:", err);
-      // keep placeholders on error (no set)
+      // keep placeholders on error
     });
-}, [OPTIMISE_ENDPOINT, pkmnTeamNames]);
+}, [OPTIMISE_ENDPOINT]); // safe: only depends on endpoint; guarded by didFetchOptimiser
 
 
 
@@ -206,28 +223,31 @@ React.useEffect(() => {
     return <Error statusCode={404} />;
   }
   const pageMeta = plasmicData.entryCompMetas[0];
+  
+  // Ensure pkmnTeamNames is always an array of length 6 (use placeholders if needed)
+  const safeNames = Array.isArray(pkmnTeamNames) ? pkmnTeamNames : Array.from({ length: 6 }, (_, i) => "");
 
-  // Map component props to Plasmic children (names must match your Plasmic component display names / props)
-  const componentProps = {
+  // Map component props to Plasmic children
+  const baseProps = {
     testSlider1: {
-      // NOTE: make sure the prop name here (value) matches the prop name in Plasmic for the slider
-      Value: sliderValue, // if Plasmic expects `Value` (capital V) — use that. Match what you configured.
       onValueChange: onValueChange,
     },
     apiTestTextBox: {
-      // the text prop in your Plasmic text box (match exactly)
       text: initialNumber,
     },
     multiplyBox: {
-      // the prop name you set in Plasmic for the multiply box (valueMb or similar). Adjust if different.
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
-    items:pkmnTeamNames,
-    teamNames: pkmnTeamNames,
-    
+    teamNames: safeNames,
   };
 
-
+  const cardProps = safeNames.reduce<Record<string, unknown>>((acc, nm, idx) => {
+    const cardNumber = idx + 1; // 1..6
+    acc[`pkmnCard${cardNumber}`] = { [`pkmnName${cardNumber}`]: nm };
+    return acc;
+  }, {});
+  // Merge base props + card props into the object we actually pass to Plasmic
+  const componentProps = { ...baseProps, ...cardProps };
   
   return (
     <PlasmicRootProvider
