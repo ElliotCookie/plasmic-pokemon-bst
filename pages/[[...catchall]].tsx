@@ -139,7 +139,7 @@ React.useEffect(() => {
 
       // Build names array from returned team entries
       const returnedTeam = data.team as (TeamMember | null | string)[];
-      const extractedNames: string[] = returnedTeam.map((entry, idx) => {
+      const extractedNames: string[] = returnedTeam.map((entry) => {
         if (!entry) return ""; // empty if missing
         if (typeof entry === "string") return entry;
         return entry.name ?? "";
@@ -223,13 +223,15 @@ React.useEffect(() => {
     return <Error statusCode={404} />;
   }
   const pageMeta = plasmicData.entryCompMetas[0];
-  
+
   // Ensure pkmnTeamNames is always an array of length 6 (use placeholders if needed)
-  const safeNames = Array.isArray(pkmnTeamNames) ? pkmnTeamNames : Array.from({ length: 6 }, (_, i) => "");
+  const safeNames = Array.isArray(pkmnTeamNames) ? pkmnTeamNames : Array(6).fill("");
+
 
   // Map component props to Plasmic children
   const baseProps = {
     testSlider1: {
+      Value: sliderValue,
       onValueChange: onValueChange,
     },
     apiTestTextBox: {
