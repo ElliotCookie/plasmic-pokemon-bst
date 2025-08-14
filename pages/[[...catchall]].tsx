@@ -29,7 +29,10 @@ export default function PlasmicLoaderPage(props: {
   // -----------------------
   // Top-level Hooks (must be here)
   // -----------------------
-  const [sliderValue, setSliderValue] = React.useState<number>(0);
+  const [sliderValues, setSliderValues] = React.useState({
+  testSlider1: 0,
+  totalWknsPerType: 0,
+});
   const [initialNumber, setInitialNumber] = React.useState<string>("loading...");
   const [multiplyResultPa, setMultiplyResultPa] = React.useState<number | null>(null);
 
@@ -163,57 +166,96 @@ React.useEffect(() => {
 }, [OPTIMISE_ENDPOINT]); // safe: only depends on endpoint; guarded by didFetchOptimiser
 
 
-
-
-
-  // Handler called when slider changes in Plasmic
-  async function onValueChange(newSliderValue: number) {
+async function onValueChange(sliderName: string, newValue: number) {
   try {
-    // immediate UI update
-    setSliderValue(newSliderValue);
-    console.log("Slider event - newSliderValue:", newSliderValue);
+    const updated = { ...sliderValues, [sliderName]: newValue };
+    setSliderValues(updated);
+    console.log(`🔧 Slider "${sliderName}" →`, newValue);
 
-    // POST to backend
-    console.log("📤 About to POST to /multiply with:", { value: newSliderValue });
-    const res = await fetch(`${BACKEND}/multiply`, {
+    if (sliderName === "testSlider1") {
+      // ---- /multiply branch ----
+      console.log("📤 POST → /multiply:", { value: newValue });
+      const res = await fetch(`${BACKEND}/multiply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: newValue }),
+      });
+
+      const txt = await res.text();
+      let parsed: unknown = null;
+      try {
+        parsed = txt ? JSON.parse(txt) : null;
+      } catch (e) {
+        console.error("JSON parse error (/multiply):", e);
+        setMultiplyResultPa(null);
+        return;
+      }
+
+      if (res.ok && isResultObject(parsed)) {
+        const num = Number(parsed.result);
+        if (!Number.isNaN(num)) {
+          setMultiplyResultPa(num);
+          console.log("✅ /multiply result:", num);
+        } else {
+          console.warn("Non-numeric /multiply result:", parsed.result);
+          setMultiplyResultPa(null);
+        }
+      } else {
+        console.warn("API error or unexpected /multiply shape:", res.status, parsed);
+        setMultiplyResultPa(null);
+      }
+      return;
+    }
+
+    // ---- /api/optimise branch ----
+    console.log("📤 POST → /api/optimise with params:", updated);
+    const res = await fetch(`${OPTIMISE_ENDPOINT}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ value: newSliderValue }),
+      body: JSON.stringify(updated),
     });
 
-    console.log("Response status:", res.status);
-
-    // Read as text first (robust if backend returns HTML/text)
     const txt = await res.text();
-
-    // Try to parse JSON (safe: won't throw because we control try/catch)
     let parsed: unknown = null;
     try {
       parsed = txt ? JSON.parse(txt) : null;
-    } catch (err) {
-    // make sure the caught error is logged and used so it's not flagged
-    console.error("Error calling API:", err);
-    setMultiplyResultPa(null);
+    } catch (e) {
+      console.error("JSON parse error (/api/optimise):", e);
+      return;
     }
 
-    // Validate parsed shape with type guard
-    if (res.ok && isResultObject(parsed)) {
-      // result might be string or number — normalise to number
-      const numericResult = Number(parsed.result);
-      if (!Number.isNaN(numericResult)) {
-        setMultiplyResultPa(numericResult);
-        console.log("API returned numeric result:", numericResult);
-      } else {
-        console.warn("API returned result that is not numeric:", parsed.result);
-        setMultiplyResultPa(null);
-      }
+    const looksLikeTeamArray =
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as Record<string, unknown>).team);
+
+    if (res.ok && looksLikeTeamArray) {
+      const team = (parsed as { team: unknown[] }).team;
+      const names = team.map((entry, i) => {
+        if (typeof entry === "string") return entry;
+        if (
+          entry &&
+          typeof entry === "object" &&
+          "name" in (entry as Record<string, unknown>) &&
+          typeof (entry as Record<string, unknown>).name === "string"
+        ) {
+          return (entry as Record<string, unknown>).name as string;
+        }
+        return String(i + 1);
+      });
+
+      const padded =
+        names.length >= 6
+          ? names.slice(0, 6)
+          : [...names, ...Array.from({ length: 6 - names.length }, (_, i) => String(names.length + i + 1))];
+
+      setPkmnTeamNames(padded);
+      console.log("✅ Optimiser team names:", padded);
     } else {
-      console.warn("API error or unexpected response shape:", res.status, parsed);
-      setMultiplyResultPa(null);
+      console.warn("API error or unexpected optimiser shape:", res.status, parsed);
     }
   } catch (err) {
-    console.error("Error calling API:", err);
-    setMultiplyResultPa(null);
+    console.error("Error in onValueChange:", err);
   }
 }
 
@@ -231,8 +273,12 @@ React.useEffect(() => {
   // Map component props to Plasmic children
   const baseProps = {
     testSlider1: {
-      Value: sliderValue,
-      onValueChange: onValueChange,
+      Value: sliderValues.testSlider1 ?? 0,
+      onValueChange: (val: number) => onValueChange("testSlider1", val),
+    },
+    totalWknsPerType: {
+      Value: sliderValues.totalWknsPerType ?? 0,
+      onValueChange: (val: number) => onValueChange("totalWknsPerType", val),
     },
     apiTestTextBox: {
       text: initialNumber,
