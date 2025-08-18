@@ -23,3 +23,36 @@ To learn more about Plasmic, take a look at the following resources:
 - [Plasmic Community Forum](https://forum.plasmic.app/)
 
 You can check out [the Plasmic GitHub repository](https://github.com/plasmicapp/plasmic) - your feedback and contributions are welcome!
+
+
+
+
+Some notes for me bcos I'm losing my mind 
+
+testSlider1
+
+Settings
+
+Slider props 
+Value - 100 
+no hard links 
+Interactions - onValueChange (0 actions)
+
+page data - Sv pkmn name "", variable bst Nothing
+
+---Component stuff
+testSlider1
+
+Aria Slider props 
+all hyperlinked, initial value is greyed out 0
+
+Interactions
+on change end
+Run onValue change - action - run interation prop - interaction prop - onValueChange
+
+On change (0 actions)
+
+
+Component data
+Value - 100, onValueChange - Nothing, On change - AsyncFunction, maxBST - Nothing
+No data queries or state variables 
