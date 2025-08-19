@@ -346,10 +346,8 @@ async function onValueChange(sliderName: string, newValue: number) {
     },
     teamNames: safeNames,
 
-    avgBstText: {
-    // Display as string for Plasmic text element. Use empty string if not available.
-    text: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
-    },
+    avgBstText: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
+
   };
 
   const cardProps = safeNames.reduce<Record<string, unknown>>((acc, nm, idx) => {
