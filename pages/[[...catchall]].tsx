@@ -32,6 +32,7 @@ export default function PlasmicLoaderPage(props: {
   const [sliderValues, setSliderValues] = React.useState({
   testSlider1: 0,
   totalPkmnBST: 0,
+  bstSlider: 0,
 });
   const [initialNumber, setInitialNumber] = React.useState<string>("loading...");
   const [multiplyResultPa, setMultiplyResultPa] = React.useState<number | null>(null);
@@ -279,6 +280,10 @@ async function onValueChange(sliderName: string, newValue: number) {
     totalPkmnBST: {
       Value: sliderValues.totalPkmnBST ?? 0,
       onValueChange: (val: number) => onValueChange("totalPkmnBST", val),
+    },
+    bstSlider: {   
+      Value: sliderValues.bstSlider ?? 0,
+      onValueChange: (val: number) => onValueChange("bstSlider", val),
     },
     apiTestTextBox: {
       text: initialNumber,
