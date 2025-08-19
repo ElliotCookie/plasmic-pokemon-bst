@@ -45,6 +45,17 @@ export default function PlasmicLoaderPage(props: {
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
   const OPTIMISE_ENDPOINT = `${BACKEND}/api/optimise`;
 
+  // Map UI slider keys -> solver constraint names (single source of truth)
+  // Add new mappings here as you create sliders.
+  const SLIDER_TO_CONSTRAINT: Record<string, string> = {
+    bstSlider: "MAX_POKE_BST",
+    totalPkmnBST: "MAX_POKE_BST",
+    // Example future entries:
+    // teamSizeSlider: "TEAM_SIZE",
+    // maxLegendariesSlider: "MAX_LEGENDARIES",
+  };
+
+
   // --- TypeScript interfaces for defensive typing ---
   interface TeamMember {
     name?: string | null;
@@ -169,12 +180,13 @@ React.useEffect(() => {
 
 async function onValueChange(sliderName: string, newValue: number) {
   try {
+    // 1) Update state immediately (UI responsiveness)
     const updated = { ...sliderValues, [sliderName]: newValue };
     setSliderValues(updated);
     console.log(`🔧 Slider "${sliderName}" →`, newValue);
 
+    // 2) Existing multiply behaviour (keep exactly as before)
     if (sliderName === "testSlider1") {
-      // ---- /multiply branch ----
       console.log("📤 POST → /multiply:", { value: newValue });
       const res = await fetch(`${BACKEND}/multiply`, {
         method: "POST",
@@ -182,83 +194,87 @@ async function onValueChange(sliderName: string, newValue: number) {
         body: JSON.stringify({ value: newValue }),
       });
 
+      console.log("Response status:", res.status);
       const txt = await res.text();
       let parsed: unknown = null;
       try {
         parsed = txt ? JSON.parse(txt) : null;
-      } catch (e) {
-        console.error("JSON parse error (/multiply):", e);
+      } catch (err) {
+        console.error("JSON parse error (/multiply):", err);
         setMultiplyResultPa(null);
-        return;
       }
 
       if (res.ok && isResultObject(parsed)) {
-        const num = Number(parsed.result);
-        if (!Number.isNaN(num)) {
-          setMultiplyResultPa(num);
-          console.log("✅ /multiply result:", num);
+        const numericResult = Number(parsed.result);
+        if (!Number.isNaN(numericResult)) {
+          setMultiplyResultPa(numericResult);
+          console.log("✅ /multiply result:", numericResult);
         } else {
-          console.warn("Non-numeric /multiply result:", parsed.result);
+          console.warn("Non-numeric /multiply result:", parsed);
           setMultiplyResultPa(null);
         }
       } else {
         console.warn("API error or unexpected /multiply shape:", res.status, parsed);
         setMultiplyResultPa(null);
       }
-      return;
+      return; // done for multiply slider
     }
 
-    // ---- /api/optimise branch ----
-    console.log("📤 POST → /api/optimise with params:", updated);
-    const res = await fetch(`${OPTIMISE_ENDPOINT}`, {
+    // 3) Build solver-shaped payload using the central mapping
+    const solverParams: Record<string, number | string> = {};
+    // Map any updated sliders that have a mapping
+    Object.keys(updated).forEach((k) => {
+      const mapped = (SLIDER_TO_CONSTRAINT as Record<string, string>)[k];
+      if (mapped) solverParams[mapped] = (updated as any)[k];
+    });
+
+    // fallback: if no mapping matched, send the full updated object
+    const bodyToSend = Object.keys(solverParams).length ? solverParams : updated;
+
+    console.log("📤 POST → /api/optimise with payload:", bodyToSend);
+    const res = await fetch(OPTIMISE_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
+      body: JSON.stringify(bodyToSend),
     });
 
     const txt = await res.text();
-    let parsed: unknown = null;
+    let parsed: any = null;
     try {
       parsed = txt ? JSON.parse(txt) : null;
-    } catch (e) {
-      console.error("JSON parse error (/api/optimise):", e);
+    } catch (err) {
+      console.error("JSON parse error (/api/optimise):", err);
       return;
     }
 
-    const looksLikeTeamArray =
-      parsed &&
-      typeof parsed === "object" &&
-      Array.isArray((parsed as Record<string, unknown>).team);
-
-    if (res.ok && looksLikeTeamArray) {
-      const team = (parsed as { team: unknown[] }).team;
+    // 4) Defensive parsing + set names into UI
+    if (res.ok && parsed && Array.isArray(parsed.team)) {
+      const team = parsed.team as unknown[];
       const names = team.map((entry, i) => {
+        if (!entry) return String(i + 1);
         if (typeof entry === "string") return entry;
-        if (
-          entry &&
-          typeof entry === "object" &&
-          "name" in (entry as Record<string, unknown>) &&
-          typeof (entry as Record<string, unknown>).name === "string"
-        ) {
+        if (typeof entry === "object" && entry !== null && "name" in (entry as Record<string, unknown>)) {
           return (entry as Record<string, unknown>).name as string;
         }
         return String(i + 1);
       });
 
-      const padded =
-        names.length >= 6
-          ? names.slice(0, 6)
-          : [...names, ...Array.from({ length: 6 - names.length }, (_, i) => String(names.length + i + 1))];
+      // pad/truncate to exactly 6
+      const padded = names.length >= 6
+        ? names.slice(0, 6)
+        : [...names, ...Array.from({ length: 6 - names.length }, (_, i) => String(names.length + i + 1))];
 
       setPkmnTeamNames(padded);
       console.log("✅ Optimiser team names:", padded);
     } else {
       console.warn("API error or unexpected optimiser shape:", res.status, parsed);
     }
+
   } catch (err) {
     console.error("Error in onValueChange:", err);
   }
 }
+
 
 
   // Keep the Plasmic required early-return after hooks.
