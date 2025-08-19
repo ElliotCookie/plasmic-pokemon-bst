@@ -41,6 +41,13 @@ export default function PlasmicLoaderPage(props: {
   const [pkmnTeamNames, setPkmnTeamNames] = React.useState<string[]>(
   Array.from({ length: 6 }, (_, i) => String(i + 1)));
 
+  // Metrics derived from the last optimiser result (expandable)
+  const [teamMetrics, setTeamMetrics] = React.useState<{
+    avgBst: number | null;
+  }>({
+    avgBst: null,
+  });
+
   // Backend base URL: use env in production, fallback to your PA domain for local dev
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
   const OPTIMISE_ENDPOINT = `${BACKEND}/api/optimise`;
@@ -240,7 +247,7 @@ async function onValueChange(sliderName: string, newValue: number) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyToSend),
     });
-    
+
     const txt = await res.text();
     let parsed: unknown = null;
     try {
@@ -277,6 +284,27 @@ async function onValueChange(sliderName: string, newValue: number) {
 
       setPkmnTeamNames(padded);
       console.log("✅ Optimiser team names:", padded);
+
+      type TeamMemberLocal = {
+        name?: string | null;
+        type1?: string | null;
+        type2?: string | null;
+        bst?: number | null;
+        stats?: Record<string, number> | null;
+      };
+
+      const typedTeam = (team as unknown[]) as TeamMemberLocal[];
+
+      // 1) total BST and average BST
+      const totalBst = typedTeam.reduce((acc, m) => acc + (m.bst ?? 0), 0);
+      const avgBst = typedTeam.length ? totalBst / typedTeam.length : null;
+
+      // Save metrics into state for the UI
+      setTeamMetrics({
+        avgBst: avgBst !== null ? Number(avgBst.toFixed(2)) : null,
+      });
+      console.log("[Metrics] avgBst:", avgBst, "totalBst:", totalBst);
+
     } else {
       console.warn("API error or unexpected optimiser shape:", res.status, parsed);
     }
@@ -317,6 +345,11 @@ async function onValueChange(sliderName: string, newValue: number) {
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
     teamNames: safeNames,
+    
+    avgBstText: {
+    // Display as string for Plasmic text element. Use empty string if not available.
+    text: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
+    },
   };
 
   const cardProps = safeNames.reduce<Record<string, unknown>>((acc, nm, idx) => {
