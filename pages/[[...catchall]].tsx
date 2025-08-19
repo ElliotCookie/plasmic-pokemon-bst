@@ -345,7 +345,7 @@ async function onValueChange(sliderName: string, newValue: number) {
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
     teamNames: safeNames,
-    
+
     avgBstText: {
     // Display as string for Plasmic text element. Use empty string if not available.
     text: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
