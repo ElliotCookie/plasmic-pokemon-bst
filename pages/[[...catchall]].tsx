@@ -301,7 +301,7 @@ async function onValueChange(sliderName: string, newValue: number) {
 
       // Save metrics into state for the UI
       setTeamMetrics({
-        avgBst: avgBst !== null ? Number(avgBst.toFixed(2)) : null,
+        avgBst: avgBst !== null ? Number(avgBst) : null,
       });
       console.log("[Metrics] avgBst:", avgBst, "totalBst:", totalBst);
 
@@ -347,7 +347,7 @@ async function onValueChange(sliderName: string, newValue: number) {
     teamNames: safeNames,
 
     bstOfTeam: {
-      svPkmnBst: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
+      svPkmnBst: teamMetrics.avgBst !== null ? String(Math.round(teamMetrics.avgBst)) : "",
     },
   };
 
