@@ -33,6 +33,7 @@ export default function PlasmicLoaderPage(props: {
   testSlider1: 0,
   totalPkmnBST: 0,
   bstSlider: 0,
+  totalWknsSlider: 0,  
 });
   const [initialNumber, setInitialNumber] = React.useState<string>("loading...");
   const [multiplyResultPa, setMultiplyResultPa] = React.useState<number | null>(null);
@@ -52,11 +53,10 @@ export default function PlasmicLoaderPage(props: {
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
   const OPTIMISE_ENDPOINT = `${BACKEND}/api/optimise`;
 
-  // Map UI slider keys -> solver constraint names (single source of truth)
-  // Add new mappings here as you create sliders.
   const SLIDER_TO_CONSTRAINT: Record<string, string> = {
     bstSlider: "MAX_POKE_BST",
     totalPkmnBST: "MAX_POKE_BST",
+    totalWknsSlider: "MAX_WEAKNESSES_PER_TYPE",
     // Example future entries:
     // teamSizeSlider: "TEAM_SIZE",
     // maxLegendariesSlider: "MAX_LEGENDARIES",
@@ -185,6 +185,8 @@ React.useEffect(() => {
 }, [OPTIMISE_ENDPOINT]); // safe: only depends on endpoint; guarded by didFetchOptimiser
 
 
+
+
 async function onValueChange(sliderName: string, newValue: number) {
   try {
     const updated = { ...sliderValues, [sliderName]: newValue };
@@ -228,6 +230,8 @@ async function onValueChange(sliderName: string, newValue: number) {
 
     // ---- /api/optimise branch ----
     // Build a solver-shaped payload deterministically using SLIDER_TO_CONSTRAINT
+
+    
     const updatedTyped = updated as Record<string, number | string>;
     const solverPayload: Record<string, number | string> = {};
     Object.keys(updatedTyped).forEach((k: string) => {
@@ -338,17 +342,25 @@ async function onValueChange(sliderName: string, newValue: number) {
       Value: sliderValues.bstSlider ?? 0,
       onValueChange: (val: number) => onValueChange("bstSlider", val),
     },
+    totalWknsSlider: {
+      Value: sliderValues.totalWknsSlider ?? 0,
+      onValueChange: (val: number) => onValueChange("totalWknsSlider", val),
+    },
+
     apiTestTextBox: {
       text: initialNumber,
     },
     multiplyBox: {
       valueMb: multiplyResultPa !== null ? String(multiplyResultPa) : "",
     },
+
     teamNames: safeNames,
 
     bstOfTeam: {
       svPkmnBst: teamMetrics.avgBst !== null ? String(Math.round(teamMetrics.avgBst)) : "",
     },
+    // I'll be adding maxTypeWeakness later 
+    
   };
 
   const cardProps = safeNames.reduce<Record<string, unknown>>((acc, nm, idx) => {
