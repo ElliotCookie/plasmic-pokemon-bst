@@ -346,8 +346,9 @@ async function onValueChange(sliderName: string, newValue: number) {
     },
     teamNames: safeNames,
 
-    svPkmnBstPg: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
-
+    bstOfTeam: {
+      svPkmnBst: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
+    },
   };
 
   const cardProps = safeNames.reduce<Record<string, unknown>>((acc, nm, idx) => {
