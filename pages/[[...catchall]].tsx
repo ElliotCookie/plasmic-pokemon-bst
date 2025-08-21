@@ -358,6 +358,12 @@ async function onValueChange(sliderName: string, newValue: number) {
   // Merge base props + card props into the object we actually pass to Plasmic
   const componentProps = { ...baseProps, ...cardProps };
   
+  console.log("DEBUG componentProps (before render):", { basePropsSnapshot: {
+    svPkmnBst: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "", 
+    teamMetrics
+  }});
+
+
   return (
     <PlasmicRootProvider
       loader={PLASMIC}
