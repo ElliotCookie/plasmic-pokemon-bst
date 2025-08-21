@@ -346,7 +346,7 @@ async function onValueChange(sliderName: string, newValue: number) {
     },
     teamNames: safeNames,
 
-    svPkmnBst: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
+    svPkmnBstPg: teamMetrics.avgBst !== null ? String(teamMetrics.avgBst) : "",
 
   };
 
