@@ -33,7 +33,8 @@ export default function PlasmicLoaderPage(props: {
   testSlider1: 0,
   totalPkmnBST: 0,
   bstSlider: 0,
-  totalWknsSlider: 0,  
+  totalWknsSlider: 0,
+  minResistSlider: 0,  
 });
   const [initialNumber, setInitialNumber] = React.useState<string>("loading...");
   const [multiplyResultPa, setMultiplyResultPa] = React.useState<number | null>(null);
@@ -57,6 +58,7 @@ export default function PlasmicLoaderPage(props: {
     bstSlider: "MAX_POKE_BST",
     totalPkmnBST: "MAX_POKE_BST",
     totalWknsSlider: "MAX_WEAKNESSES_PER_TYPE",
+    minResistSlider: "MIN_RESISTANCES_PER_TYPE"
     // Example future entries:
     // teamSizeSlider: "TEAM_SIZE",
     // maxLegendariesSlider: "MAX_LEGENDARIES",
@@ -346,6 +348,10 @@ async function onValueChange(sliderName: string, newValue: number) {
       Value: sliderValues.totalWknsSlider ?? 0,
       onValueChange: (val: number) => onValueChange("totalWknsSlider", val),
     },
+    minResistSlider: {
+      Value: sliderValues.minResistSlider ?? 0,
+      onValueChange: (val: number) => onValueChange("totalWknsSlider", val),
+    },
 
     apiTestTextBox: {
       text: initialNumber,
@@ -358,6 +364,9 @@ async function onValueChange(sliderName: string, newValue: number) {
 
     bstOfTeam: {
       svPkmnBst: teamMetrics.avgBst !== null ? String(Math.round(teamMetrics.avgBst)) : "",
+    },
+    minResistPerType: {
+      scMinResist: teamMetrics.avgBst !== null ? String(Math.round(teamMetrics.avgBst)) : "",
     },
     // I'll be adding maxTypeWeakness later 
     
