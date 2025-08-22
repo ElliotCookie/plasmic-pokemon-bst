@@ -350,7 +350,7 @@ async function onValueChange(sliderName: string, newValue: number) {
     },
     minResistSlider: {
       Value: sliderValues.minResistSlider ?? 0,
-      onValueChange: (val: number) => onValueChange("totalWknsSlider", val),
+      onValueChange: (val: number) => onValueChange("minResistSlider", val),
     },
 
     apiTestTextBox: {
