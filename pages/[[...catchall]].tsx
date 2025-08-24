@@ -309,7 +309,7 @@ async function onValueChange(sliderName: string, newValue: number) {
       setTeamMetrics({
         avgBst: avgBst !== null ? Number(avgBst) : null,
       });
-      console.log("[Metrics] avgBst:", avgBst, "totalBst:", totalBst);
+      console.log(`[Optimiser Metrics] status=${(parsed as OptimiserResponse)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst}`);
 
     } else {
       console.warn("API error or unexpected optimiser shape:", res.status, parsed);
