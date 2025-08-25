@@ -263,12 +263,37 @@ async function onValueChange(sliderName: string, newValue: number) {
       return;
     }
 
+    // defensive parse done above; `parsed` holds the response object (or null)
+    const parsedObj = (parsed ?? {}) as Record<string, unknown>;
+
+    // 1) Detect explicit API error OR solver infeasible status
+    const apiErrorFlag = parsedObj["error"] === true;
+    const statusRaw = typeof parsedObj["status"] === "string" ? (parsedObj["status"] as string) : "";
+    const statusLower = statusRaw.toLowerCase();
+
+    // Treat as infeasible if server sets error OR status === "infeasible"
+    if (apiErrorFlag || statusLower === "infeasible") {
+      console.warn("API reports infeasible or error; showing Infeasible placeholders:", parsedObj);
+
+      // populate all 6 slots with "Infeasible" immediately (do not use parsed.team)
+      const infArr = Array.from({ length: 6 }, () => "Infeasible");
+      setPkmnTeamNames(infArr);
+
+      // reset derived metrics (optional)
+      setTeamMetrics({ avgBst: null });
+
+      // Short-circuit — we intentionally do not try to extract team or metrics from an infeasible result
+      return;
+    }
+
+    // 2) Normal successful handling — does it contain a team array?
     const looksLikeTeamArray =
       parsed &&
       typeof parsed === "object" &&
       Array.isArray((parsed as Record<string, unknown>).team);
 
     if (res.ok && looksLikeTeamArray) {
+      // ... your existing handling for parsed.team (leave this intact) ...
       const team = (parsed as { team: unknown[] }).team;
       const names = team.map((entry, i) => {
         if (typeof entry === "string") return entry;
@@ -309,15 +334,13 @@ async function onValueChange(sliderName: string, newValue: number) {
       setTeamMetrics({
         avgBst: avgBst !== null ? Number(avgBst) : null,
       });
-      console.log(`[Optimiser Metrics] status=${(parsed as OptimiserResponse)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst}`);
-
+      console.log(
+        `[Optimiser Metrics] status=${(parsed as Record<string, unknown>)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst}`
+      );
     } else {
       console.warn("API error or unexpected optimiser shape:", res.status, parsed);
     }
-  } catch (err) {
-    console.error("Error in onValueChange:", err);
-  }
-}
+
 
 
   // Keep the Plasmic required early-return after hooks.
