@@ -82,7 +82,6 @@ export default function PlasmicLoaderPage(props: {
   type_weakness_totals?: Record<string, number>;
 }
 
-
   // type guard: returns true if obj looks like { result: number | string }
   function isResultObject(obj: unknown): obj is { result: number | string } {
     if (obj === null || obj === undefined) return false;
@@ -98,29 +97,6 @@ export default function PlasmicLoaderPage(props: {
     const val = o["result"];
     return typeof val === "number" || typeof val === "string";
   }
-
-/*   // --- Type guard to validate backend response shape ---
-  function isOptimiserResponse(obj: unknown): obj is OptimiserResponse {
-    if (!obj || typeof obj !== "object") return false;
-    const o = obj as Record<string, unknown>;
-    if (!Object.prototype.hasOwnProperty.call(o, "team")) return false;
-    const team = o.team;
-    if (!Array.isArray(team)) return false;
-    // ensure each team entry is either an object or undefined/null
-    return team.every((t) => t === null || typeof t === "object" || typeof t === "string");
-  }
-
-
-  // Helper to safely get the name for a given index
-  function getNameForIndex(i: number): string {
-    if (i < 0) return "";
-    if (i < pkmnTeamNames.length) return pkmnTeamNames[i] ?? "";
-    return "";
-  }
- */
-
-
-
 
   // Fetch initial number once on client-side mount
   React.useEffect(() => {
@@ -262,7 +238,6 @@ async function onValueChange(sliderName: string, newValue: number) {
       console.error("JSON parse error (/api/optimise):", e);
       return;
     }
-
     // defensive parse done above; `parsed` holds the response object (or null)
     const parsedObj = (parsed ?? {}) as Record<string, unknown>;
 
@@ -284,16 +259,15 @@ async function onValueChange(sliderName: string, newValue: number) {
 
       // Short-circuit — we intentionally do not try to extract team or metrics from an infeasible result
       return;
-    }
+    }  
 
-    // 2) Normal successful handling — does it contain a team array?
+
     const looksLikeTeamArray =
       parsed &&
       typeof parsed === "object" &&
       Array.isArray((parsed as Record<string, unknown>).team);
 
     if (res.ok && looksLikeTeamArray) {
-      // ... your existing handling for parsed.team (leave this intact) ...
       const team = (parsed as { team: unknown[] }).team;
       const names = team.map((entry, i) => {
         if (typeof entry === "string") return entry;
@@ -334,13 +308,15 @@ async function onValueChange(sliderName: string, newValue: number) {
       setTeamMetrics({
         avgBst: avgBst !== null ? Number(avgBst) : null,
       });
-      console.log(
-        `[Optimiser Metrics] status=${(parsed as Record<string, unknown>)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst}`
-      );
+      console.log(`[Optimiser Metrics] status=${(parsed as Record<string, unknown>)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst}`);
+      
     } else {
       console.warn("API error or unexpected optimiser shape:", res.status, parsed);
     }
-
+  } catch (err) {
+    console.error("Error in onValueChange:", err);
+  }
+}
 
 
   // Keep the Plasmic required early-return after hooks.
