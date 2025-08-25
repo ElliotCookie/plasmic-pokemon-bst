@@ -45,10 +45,23 @@ export default function PlasmicLoaderPage(props: {
 
   // Metrics derived from the last optimiser result (expandable)
   const [teamMetrics, setTeamMetrics] = React.useState<{
-    avgBst: number | null;
-  }>({
-    avgBst: null,
-  });
+  avgBst: number | null;
+  maxBst: number | null;
+  sumWknsAv: number | null;
+  sumWknsMax: number | null;
+  minResist: number | null;
+}>({
+  avgBst: null,
+  maxBst: null,
+  sumWknsAv: null,
+  sumWknsMax: null,
+  minResist: null,
+});
+
+  // new: display string for "avg, max" to show in Plasmic
+  const [teamBstDisplay, setTeamBstDisplay] = React.useState<string>("");
+  const [teamWknsDisplay, setTeamWknsDisplay] = React.useState<string>("");
+
 
   // Backend base URL: use env in production, fallback to your PA domain for local dev
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://elliotcookie.pythonanywhere.com";
@@ -254,9 +267,6 @@ async function onValueChange(sliderName: string, newValue: number) {
       const infArr = Array.from({ length: 6 }, () => "Infeasible");
       setPkmnTeamNames(infArr);
 
-      // reset derived metrics (optional)
-      setTeamMetrics({ avgBst: null });
-
       // Short-circuit — we intentionally do not try to extract team or metrics from an infeasible result
       return;
     }  
@@ -303,13 +313,48 @@ async function onValueChange(sliderName: string, newValue: number) {
       // 1) total BST and average BST
       const totalBst = typedTeam.reduce((acc, m) => acc + (m.bst ?? 0), 0);
       const avgBst = typedTeam.length ? totalBst / typedTeam.length : null;
+      const maxBst = typedTeam.length
+        ? Math.max(...typedTeam.map((m) => (m.bst ?? Number.NEGATIVE_INFINITY)))
+        : null;
 
-      // Save metrics into state for the UI
+      const bstStr =
+        avgBst !== null
+          ? (maxBst !== null ? `${Math.round(avgBst)}, ${Math.round(maxBst)}` : `${Math.round(avgBst)}`)
+          : (maxBst !== null ? `${Math.round(maxBst)}` : "");
+      setTeamBstDisplay(bstStr);
+
+      // 2) sum weakness average and max (from API response)
+      const resp = (parsed ?? {}) as OptimiserResponse;
+      const typeWeaknessTotals = resp.type_weakness_totals; // may be undefined
+
+      let sumWknsAv: number | null = null;
+      let sumWknsMax: number | null = null;
+
+      if (typeWeaknessTotals && Object.keys(typeWeaknessTotals).length > 0) {
+        const vals = Object.values(typeWeaknessTotals).map((v) => Number(v) || 0);
+        const tot = vals.reduce((a, b) => a + b, 0);
+        sumWknsAv = vals.length ? tot / vals.length : null;
+        sumWknsMax = vals.length ? Math.max(...vals) : null;
+      }
+
+      const wknsStr =
+        sumWknsAv !== null
+          ? (sumWknsMax !== null ? `${Math.round(sumWknsAv)}, ${Math.round(sumWknsMax)}` : `${Math.round(sumWknsAv)}`)
+          : (sumWknsMax !== null ? `${Math.round(sumWknsMax)}` : "");
+      setTeamWknsDisplay(wknsStr);
+
+      // Save metrics into state for the UI (store numeric values)
       setTeamMetrics({
         avgBst: avgBst !== null ? Number(avgBst) : null,
+        maxBst: maxBst !== null && Number.isFinite(maxBst) ? Number(maxBst) : null,
+        sumWknsAv,
+        sumWknsMax,
+        minResist: null,
       });
-      console.log(`[Optimiser Metrics] status=${(parsed as Record<string, unknown>)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst}`);
-      
+
+    console.log(
+      `[Optimiser Metrics] status=${(parsed as Record<string, unknown>)?.status ?? res.status} team_count=${typedTeam.length} totalBst=${totalBst} avgBst=${avgBst} maxBst=${maxBst}`
+    );
     } else {
       console.warn("API error or unexpected optimiser shape:", res.status, parsed);
     }
@@ -362,13 +407,17 @@ async function onValueChange(sliderName: string, newValue: number) {
     teamNames: safeNames,
 
     bstOfTeam: {
-      svPkmnBst: teamMetrics.avgBst !== null ? String(Math.round(teamMetrics.avgBst)) : "",
+      svPkmnBst: teamBstDisplay,
     },
-    minResistPerType: {
-      scMinResist: teamMetrics.avgBst !== null ? String(Math.round(teamMetrics.avgBst)) : "",
+
+    totalWknsPerType: {
+      svTotalWknsPerType: teamWknsDisplay,
     },
-    // I'll be adding maxTypeWeakness later 
-    
+
+    //minResistPerType: {
+    //  svMinResist: minimumResistancesPerType,
+    //},
+     
   };
 
   const cardProps = safeNames.reduce<Record<string, unknown>>((acc, nm, idx) => {
